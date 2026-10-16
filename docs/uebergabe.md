@@ -20,7 +20,7 @@ Danach in der App unter **Einstellungen** auf „Push einschalten“ tippen und 
 
 Jeden Morgen gegen halb sieben sammelt er neue Eigentumswohnungen aus willhaben und weiteren Portalen, Bauträger- und Genossenschaftsseiten. Er behält nur, was in deinen Bezirken liegt und höchstens 350.000 € kostet. Dann schaut er für jede Wohnung nach, wie laut es dort ist (Lärmkarte), wie weit U-Bahn und Bim sind, wie viel Grün in der Nähe ist, ob der Preis pro m² über oder unter dem Bezirksschnitt liegt, ob die Adresse in einer Hochwasserzone liegt und wie das Grundstück gewidmet ist. Zum Schluss liest Claude das Inserat samt diesen Daten und vergibt einen Score von 0 bis 100 mit einer Begründung in drei Sätzen und Warnsignalen (zum Beispiel „Anlegerwohnung“, „vermietet“, „laute Straße“, „Sanierungsbedarf“).
 
-Liegt der Score über deiner Schwelle (anfangs 70), bekommst du eine Push-Nachricht – pro Wohnung genau eine. Antippen öffnet die Detailansicht.
+Liegt der Score über deiner Schwelle (anfangs 60 – die Bewertung ist streng, weil Unbelegtes nie als erfüllt zählt), bekommst du eine Push-Nachricht – pro Wohnung genau eine. Antippen öffnet die Detailansicht.
 
 ## Die App
 
@@ -51,4 +51,9 @@ Bezirke antippen: aus → ganz → teilweise. Bei „teilweise“ schreib ins No
 - willhaben ist die verlässlichste Quelle. Die anderen Portale und Bauträgerseiten liest der Radar direkt; wenn eine Seite nichts liefert oder sich umbaut, steht das in den Einstellungen bei „Quellen“ (Punkt rot). Der Lauf geht dann mit den übrigen Quellen weiter.
 - Lärm-, Öffi- und Grünwerte sind automatisch ermittelt und eine Orientierung, keine Garantie. Bei Inseraten ohne genaue Adresse wird der Bezirksmittelpunkt genommen; das steht dann bei „Koordinaten“ (plz).
 - Preisvergleich: Angebotspreise je Bezirk (derStandard Immobilien, Stand April 2026). Jährlich aktualisieren.
-- Alles läuft automatisch in der Cloud (Supabase, GitHub Pages, Anthropic, Apify) und kostet im Monat wenige Euro an API-Guthaben.
+- Alles läuft automatisch in der Cloud (Supabase, GitHub Pages, Anthropic, Apify) und kostet im Monat wenige Euro an API-Guthaben. Bewertet wird mit Claude Sonnet 5.5, Seiten liest Claude Haiku 5.5; fällt ein Modellname weg, nimmt der Radar automatisch das neueste der Familie.
+- Push wurde am 17.10.2026 in Julias Chrome erfolgreich getestet; am iPhone bitte nach der Installation einmal „Test“ drücken.
+
+## Für Julia: Technik in Kürze
+
+Code und Deployment: github.com/Julia-looops/wohnungsradar – jeder Push auf main deployt Datenbank und Functions (Workflow „Deploy Supabase“) und die App (Workflow „Deploy App“). Jeder Deploy schreibt einen Bericht mit Funktionstest, Quellenstatus und Top-Inseraten in Issue #1 „Deploy-Log“. Commit-Marker „[collect]“ startet danach einen Sammellauf, „[enrich]“ die Kette Anreicherung → Bewertung → Push. Secrets liegen als GitHub-Secrets (Deploy) und Supabase-Secrets (Functions), nie im Code. Zeitpläne laufen per pg_cron in UTC. Eine Kopie des Codes liegt in diesem Ordner unter „wohnungsradar“; die Datei „Betrieb“ im Claude-Projekt „Privat“ (claude/wohnungsradar-betrieb.md) hat alle Details.
