@@ -31,11 +31,6 @@ def show(title, sql, cols):
         print(json.dumps(res)[:800])
 
 
-show("function_logs",
-     "select timestamp, event_message, metadata.level as level from function_logs order by timestamp desc limit 60",
-     ["timestamp", "level", "event_message"])
-show("function_edge_logs",
-     "select timestamp, response.status_code as status, request.method as method, request.url as url from function_edge_logs "
-     "cross join unnest(metadata) as m cross join unnest(m.response) as response cross join unnest(m.request) as request "
-     "order by timestamp desc limit 40",
-     ["timestamp", "status", "method", "url"])
+show("Edge-Function-Logs",
+     "select timestamp, source, event_message from logs where source in ('function_logs','function_edge_logs') order by timestamp desc limit 80",
+     ["timestamp", "source", "event_message"])
