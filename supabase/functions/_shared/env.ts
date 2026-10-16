@@ -1,6 +1,9 @@
 // Umgebungsvariablen und Schlüssel der Edge Functions
 
 export function secretKey(): string {
+  // Explizit gesetzt (post_deploy) – unabhängig davon, wie die Plattform ihre Schlüssel-Variablen nennt
+  const explicit = Deno.env.get("RADAR_SECRET_KEY");
+  if (explicit) return explicit;
   const multi = Deno.env.get("SUPABASE_SECRET_KEYS");
   if (multi) {
     try {

@@ -57,7 +57,7 @@ def main():
         print("  vorhanden")
     sql(f"insert into public.settings(key, value) values ('vapid_public', to_jsonb({q(pub)}::text)) "
         f"on conflict (key) do update set value = excluded.value, updated_at = now()")
-    subprocess.run(["supabase", "secrets", "set", f"VAPID_PUBLIC_KEY={pub}", f"VAPID_PRIVATE_KEY={priv}", "--project-ref", REF],
+    subprocess.run(["supabase", "secrets", "set", f"VAPID_PUBLIC_KEY={pub}", f"VAPID_PRIVATE_KEY={priv}", f"RADAR_SECRET_KEY={SECRET_KEY}", "--project-ref", REF],
                    check=True, capture_output=True)
 
     print("Secrets prüfen (Anthropic, Apify)")

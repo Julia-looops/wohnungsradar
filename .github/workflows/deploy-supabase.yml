@@ -10,10 +10,18 @@ on:
         description: "Nach dem Deployment einen Sammellauf starten"
         type: boolean
         default: false
+      only_test:
+        description: "Nur Funktionstest und Logs (kein Deployment)"
+        type: boolean
+        default: false
 
 concurrency:
   group: deploy-supabase
   cancel-in-progress: false
+
+permissions:
+  contents: read
+  issues: write
 
 jobs:
   deploy:
@@ -21,7 +29,9 @@ jobs:
     env:
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
       SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
       PROJECT_REF: ywmarawkaozbizrunykf
+      GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v4
       - uses: supabase/setup-cli@v1
@@ -32,34 +42,60 @@ jobs:
           node-version: 22
 
       - name: Projekt verknüpfen
+        if: ${{ github.event.inputs.only_test != 'true' }}
         run: supabase link --project-ref "$PROJECT_REF" -p "$SUPABASE_DB_PASSWORD"
 
       - name: Migrationen anwenden
+        if: ${{ github.event.inputs.only_test != 'true' }}
         run: supabase db push -p "$SUPABASE_DB_PASSWORD" --include-all
 
       - name: Edge Functions deployen
+        if: ${{ github.event.inputs.only_test != 'true' }}
         run: supabase functions deploy --project-ref "$PROJECT_REF"
 
       - name: Vault, App-Token, VAPID, Haltestellen
+        if: ${{ github.event.inputs.only_test != 'true' }}
         env:
-          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
           APP_TOKEN: ${{ secrets.APP_TOKEN }}
-        run: python3 scripts/post_deploy.py
+        run: python3 scripts/post_deploy.py 2>&1 | tee /tmp/post_deploy.txt
 
       - name: Funktionstest (api/bootstrap)
-        env:
-          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+        id: fntest
+        continue-on-error: true
         run: |
           code=$(curl -s -o /tmp/boot.json -w "%{http_code}" -X POST "https://$PROJECT_REF.supabase.co/functions/v1/api" \
-            -H "apikey: $SUPABASE_SECRET_KEY" -H "Content-Type: application/json" -d '{"action":"bootstrap"}')
-          echo "HTTP $code"
-          python3 -c "import json;d=json.load(open('/tmp/boot.json'));print('Quellen:',len(d.get('sources',[])),'| aktive Inserate:',d.get('counts'),'| VAPID gesetzt:',bool(d.get('vapid_public')))"
+            -H "apikey: $SUPABASE_SECRET_KEY" -H "Content-Type: application/json" -d '{"action":"bootstrap"}' --max-time 60)
+          echo "HTTP $code" | tee /tmp/fntest.txt
+          head -c 1500 /tmp/boot.json | tee -a /tmp/fntest.txt; echo
+          python3 - <<'EOF' | tee -a /tmp/fntest.txt
+          import json
+          try:
+              d=json.load(open('/tmp/boot.json'))
+              print('Quellen:',len(d.get('sources',[])),'| Zähler:',d.get('counts'),'| VAPID gesetzt:',bool(d.get('vapid_public')),'| Kriterienversion:',d.get('version'))
+          except Exception as e:
+              print('Antwort nicht lesbar:', e)
+          EOF
           test "$code" = "200"
 
       - name: Sammellauf starten
         if: ${{ github.event.inputs.run_collect == 'true' }}
-        env:
-          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+        continue-on-error: true
         run: |
           curl -s -X POST "https://$PROJECT_REF.supabase.co/functions/v1/collect" \
-            -H "apikey: $SUPABASE_SECRET_KEY" -H "Content-Type: application/json" -d '{"all":true}' --max-time 170 | head -c 2000
+            -H "apikey: $SUPABASE_SECRET_KEY" -H "Content-Type: application/json" -d '{"all":true}' --max-time 170 | head -c 3000 | tee /tmp/collect.txt; echo
+
+      - name: Function-Logs holen
+        if: always()
+        continue-on-error: true
+        run: python3 scripts/fn_logs.py 30 2>&1 | tee /tmp/fnlogs.txt
+
+      - name: Bericht ins Deploy-Log-Issue
+        if: always()
+        continue-on-error: true
+        run: |
+          { echo "## post_deploy"; cat /tmp/post_deploy.txt 2>/dev/null || echo "(übersprungen)"; echo; echo "## Funktionstest"; cat /tmp/fntest.txt 2>/dev/null; echo; echo "## Sammellauf"; cat /tmp/collect.txt 2>/dev/null || echo "(nicht gestartet)"; echo; echo "## Logs"; cat /tmp/fnlogs.txt 2>/dev/null; } > /tmp/report.txt
+          bash scripts/report.sh "Deploy Supabase – ${{ job.status }}" /tmp/report.txt
+
+      - name: Ergebnis
+        if: ${{ steps.fntest.outcome == 'failure' }}
+        run: exit 1
