@@ -42,6 +42,11 @@ Deno.serve(async (req) => {
       await db.from("listings").update({ score_stale: true }).eq("active", true);
     }
 
+    // Fehlgeschlagene Bewertungen (ohne Score) nach 20 Minuten erneut versuchen
+    const retryBefore = new Date(Date.now() - 20 * 60000).toISOString();
+    const { data: failed } = await db.from("scores").select("listing_id").is("score", null).lt("updated_at", retryBefore).limit(50);
+    if (failed?.length) await db.from("listings").update({ score_stale: true }).in("id", failed.map((f) => f.listing_id));
+
     const { data: noteRow } = await db.from("learning_notes").select("note").order("created_at", { ascending: false }).limit(1).maybeSingle();
     const learningNote = noteRow?.note ?? null;
 

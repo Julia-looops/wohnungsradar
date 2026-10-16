@@ -28,10 +28,10 @@ export async function askClaude(user: string, opts: ClaudeOptions): Promise<Clau
           "x-api-key": key,
           "anthropic-version": "2023-06-01",
         },
+        // temperature wird bewusst nicht gesendet: neuere Modelle lehnen den Parameter ab
         body: JSON.stringify({
           model: opts.model,
           max_tokens: opts.maxTokens ?? 1500,
-          temperature: opts.temperature ?? 0.2,
           system: opts.system,
           messages: [{ role: "user", content: user }],
         }),
