@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
 """Holt die letzten Edge-Function-Logs über die Management API (für Berichte; ohne Geheimnisse)."""
-import json, os, sys, urllib.parse, urllib.request
+import datetime as dt, json, os, sys, urllib.parse, urllib.request
 
 REF = os.environ["PROJECT_REF"]
 TOKEN = os.environ["SUPABASE_ACCESS_TOKEN"]
 minutes = int(sys.argv[1]) if len(sys.argv) > 1 else 20
+start = (dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=minutes)).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def query(sql):
-    url = f"https://api.supabase.com/v1/projects/{REF}/analytics/endpoints/logs.all?" + urllib.parse.urlencode({"sql": sql})
+    url = f"https://api.supabase.com/v1/projects/{REF}/analytics/endpoints/logs?" + urllib.parse.urlencode({"sql": sql, "iso_timestamp_start": start})
     req = urllib.request.Request(url, headers={"Authorization": f"Bearer {TOKEN}"})
     try:
         with urllib.request.urlopen(req, timeout=60) as r:
@@ -17,23 +18,24 @@ def query(sql):
         return {"error": e.code, "body": e.read().decode()[:500]}
 
 
-print(f"== function_logs (letzte {minutes} Min.)")
-res = query(f"select timestamp, event_message, metadata.function_id as fn, metadata.level as level from function_logs "
-            f"where timestamp > timestamp_sub(current_timestamp(), interval {minutes} minute) order by timestamp desc limit 60")
-rows = res.get("result", res)
-if isinstance(rows, list):
-    for r in rows[:60]:
-        print(r.get("timestamp"), r.get("level"), str(r.get("event_message", ""))[:300].replace("\n", " "))
-else:
-    print(json.dumps(res)[:800])
+def show(title, sql, cols):
+    print(f"== {title} (letzte {minutes} Min.)")
+    res = query(sql)
+    rows = res.get("result") if isinstance(res, dict) else res
+    if isinstance(rows, list):
+        for r in rows[:60]:
+            print(" | ".join(str(r.get(c, ""))[:220].replace("\n", " ") for c in cols))
+        if not rows:
+            print("(keine Einträge)")
+    else:
+        print(json.dumps(res)[:800])
 
-print(f"== function_edge_logs (Status, letzte {minutes} Min.)")
-res = query(f"select timestamp, event_message, response.status_code as status, request.method as method, request.url as url "
-            f"from function_edge_logs cross join unnest(metadata) as m cross join unnest(m.response) as response cross join unnest(m.request) as request "
-            f"where timestamp > timestamp_sub(current_timestamp(), interval {minutes} minute) order by timestamp desc limit 40")
-rows = res.get("result", res)
-if isinstance(rows, list):
-    for r in rows[:40]:
-        print(r.get("timestamp"), r.get("status"), r.get("method"), str(r.get("url", ""))[:120])
-else:
-    print(json.dumps(res)[:800])
+
+show("function_logs",
+     "select timestamp, event_message, metadata.level as level from function_logs order by timestamp desc limit 60",
+     ["timestamp", "level", "event_message"])
+show("function_edge_logs",
+     "select timestamp, response.status_code as status, request.method as method, request.url as url from function_edge_logs "
+     "cross join unnest(metadata) as m cross join unnest(m.response) as response cross join unnest(m.request) as request "
+     "order by timestamp desc limit 40",
+     ["timestamp", "status", "method", "url"])
