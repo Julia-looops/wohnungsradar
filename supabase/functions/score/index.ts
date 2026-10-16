@@ -6,9 +6,9 @@
 
 import { admin, finishRun, getCriteria, getSetting, startRun } from "../_shared/db.ts";
 import { authenticate, corsHeaders, json, triggerNext, unauthorized } from "../_shared/auth.ts";
-import { askClaudeJson, resolveModel } from "../_shared/claude.ts";
+import { askClaudeStructured, resolveModel } from "../_shared/claude.ts";
 import { mapLimit } from "../_shared/http.ts";
-import { Assessment, ListingForScore, buildScorePrompt, computeScore, hardPrecheck } from "../_shared/scoring.ts";
+import { Assessment, ListingForScore, buildScorePrompt, computeScore, hardPrecheck, scoreSchema } from "../_shared/scoring.ts";
 
 const COLS = "id,title,price,area_m2,rooms,plz,district,address,floor,features,raw_text,seller_type,url,source";
 
@@ -62,7 +62,7 @@ Deno.serve(async (req) => {
         const { data: en } = await db.from("enrichments").select("*").eq("listing_id", l.id).maybeSingle();
         const pre = hardPrecheck(l, crit);
         const { system, user } = buildScorePrompt(l, en ?? null, crit, learningNote);
-        const { value, raw } = await askClaudeJson<Assessment>(user, { system, model, maxTokens: 1200, temperature: 0.1 });
+        const { value, raw } = await askClaudeStructured<Assessment>(user, scoreSchema(crit), { system, model, maxTokens: 2000 });
         if (!value || !value.hart) throw new Error("Antwort ohne JSON: " + raw.text.slice(0, 200));
         const s = computeScore(value, crit, pre.fails);
         await db.from("scores").upsert({

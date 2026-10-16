@@ -4,7 +4,7 @@
 
 import { fetchText, mapLimit } from "../http.ts";
 import { extractImages, extractJsonLd, extractLinks, htmlToText, metaContent, titleOf } from "../html.ts";
-import { askClaudeJson } from "../claude.ts";
+import { askClaudeStructured } from "../claude.ts";
 import { Candidate, CollectContext, SourceRow, findPlz, parseEuro, parseNumber } from "./types.ts";
 
 interface ListHit { url: string; title?: string; price?: number | null; area_m2?: number | null; rooms?: number | null; plz?: string | null; note?: string }
@@ -124,7 +124,9 @@ ${text}
 
 === LINKS (href | Linktext) ===
 ${links}`;
-  const { value } = await askClaudeJson<{ listings: ListHit[] }>(prompt, { model: ctx.extractModel, maxTokens: 4000, temperature: 0 });
+  const listSchema = { type: "object", properties: { listings: { type: "array", items: { type: "object", properties: {
+    url: { type: "string" }, title: { type: "string" }, price: { type: ["number", "null"] }, area_m2: { type: ["number", "null"] }, rooms: { type: ["number", "null"] }, plz: { type: ["string", "null"] }, note: { type: "string" } }, required: ["url"] } } }, required: ["listings"] };
+  const { value } = await askClaudeStructured<{ listings: ListHit[] }>(prompt, listSchema, { model: ctx.extractModel, maxTokens: 6000 });
   const arr = Array.isArray(value?.listings) ? value!.listings : [];
   const out: ListHit[] = [];
   for (const h of arr) {
@@ -162,7 +164,11 @@ async function detail(src: SourceRow, h: ListHit, ctx: CollectContext): Promise<
 ${text}`;
   let ex: DetailExtract | null = null;
   try {
-    const { value } = await askClaudeJson<DetailExtract>(prompt, { model: ctx.extractModel, maxTokens: 1200, temperature: 0 });
+    const detailSchema = { type: "object", properties: {
+      title: { type: "string" }, is_sale: { type: "boolean" }, is_vienna: { type: "boolean" }, price: { type: ["number", "null"] }, area_m2: { type: ["number", "null"] }, rooms: { type: ["number", "null"] },
+      plz: { type: ["string", "null"] }, address: { type: ["string", "null"] }, floor: { type: ["string", "null"] }, features: { type: "array", items: { type: "string" } },
+      seller_type: { type: ["string", "null"] }, summary: { type: ["string", "null"] } }, required: ["is_sale", "is_vienna", "price", "area_m2", "rooms", "plz", "features"] };
+    const { value } = await askClaudeStructured<DetailExtract>(prompt, detailSchema, { model: ctx.extractModel, maxTokens: 1500 });
     ex = value;
   } catch (e) {
     ctx.log(`${src.id}: Extraktion fehlgeschlagen ${h.url}: ${String(e).slice(0, 100)}`);

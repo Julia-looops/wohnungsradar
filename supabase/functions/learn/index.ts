@@ -3,7 +3,7 @@
 
 import { admin, Criteria, finishRun, getCriteria, getSetting, startRun } from "../_shared/db.ts";
 import { authenticate, corsHeaders, json, triggerNext, unauthorized } from "../_shared/auth.ts";
-import { askClaudeJson, resolveModel } from "../_shared/claude.ts";
+import { askClaudeStructured, resolveModel } from "../_shared/claude.ts";
 import { sendPush } from "../_shared/push.ts";
 
 interface LearnOut {
@@ -79,7 +79,18 @@ Antworte NUR mit JSON:
 - delta nur -2..2; nur Kriterien aus der Liste; keine Änderung ohne klaren Beleg in den Bewertungen.
 - district_proposals nur bei wiederholten Mustern (mindestens 2 Bewertungen).`;
 
-    const { value, raw } = await askClaudeJson<LearnOut>(prompt, { model, maxTokens: 2500, temperature: 0.2 });
+    const learnSchema = {
+      type: "object",
+      properties: {
+        note: { type: "string" },
+        weight_changes: { type: "array", items: { type: "object", properties: { key: { type: "string" }, delta: { type: "integer", minimum: -2, maximum: 2 }, reason: { type: "string" } }, required: ["key", "delta", "reason"] } },
+        district_proposals: { type: "array", items: { type: "object", properties: { district: { type: "integer" }, action: { type: "string", enum: ["ausschliessen", "aufnehmen", "einschraenken"] }, reason: { type: "string" }, note: { type: "string" } }, required: ["district", "action", "reason"] } },
+        other_proposals: { type: "array", items: { type: "object", properties: { text: { type: "string" }, change: { type: "object", properties: { type: { type: "string" }, append: { type: "string" } } } }, required: ["text", "change"] } },
+        digest: { type: "string" },
+      },
+      required: ["note", "weight_changes", "district_proposals", "other_proposals"],
+    };
+    const { value, raw } = await askClaudeStructured<LearnOut>(prompt, learnSchema, { model, maxTokens: 3000 });
     if (!value || typeof value.note !== "string") throw new Error("Lernantwort ohne JSON: " + raw.text.slice(0, 200));
 
     // Gewichte: kleine Änderungen automatisch innerhalb der Bandbreite, große als Vorschlag

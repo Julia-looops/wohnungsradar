@@ -115,3 +115,20 @@ export function computeScore(a: Assessment, c: Criteria, precheckFails: string[]
   score = Math.max(0, Math.min(100, score));
   return { score, hard_ok, hard_fail: [...hardFail], warnings };
 }
+
+const TRI = { type: "string", enum: ["ja", "nein", "unklar"] };
+const SOFT = { type: "string", enum: ["erfuellt", "nicht", "unklar"] };
+export function scoreSchema(c: Criteria): Record<string, unknown> {
+  const hart = ["selbstbezug", "lift_oder_eg", "zimmer", "flaeche", "preis", "bezirk_graetzl"];
+  return {
+    type: "object",
+    properties: {
+      hart: { type: "object", properties: Object.fromEntries(hart.map((k) => [k, TRI])), required: hart },
+      weich: { type: "object", properties: Object.fromEntries(c.soft.map((s) => [s.key, SOFT])), required: c.soft.map((s) => s.key) },
+      score: { type: "integer", minimum: 0, maximum: 100, description: "Gesamteindruck 0–100" },
+      begruendung: { type: "string", description: "Genau drei Sätze auf Deutsch mit den entscheidenden Gründen" },
+      warnsignale: { type: "array", items: { type: "string" }, description: "Warnsignale, kurz" },
+    },
+    required: ["hart", "weich", "score", "begruendung", "warnsignale"],
+  };
+}

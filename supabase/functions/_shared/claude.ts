@@ -103,3 +103,44 @@ export async function resolveModel(preferred: string, family: "sonnet" | "haiku"
     return preferred;
   }
 }
+
+/**
+ * Strukturierte Antwort über Tool-Use: das Modell muss das Schema einhalten, das Ergebnis ist garantiert gültiges JSON.
+ */
+export async function askClaudeStructured<T = unknown>(user: string, schema: Record<string, unknown>, opts: ClaudeOptions): Promise<{ value: T | null; raw: ClaudeResult }> {
+  const key = anthropicKey();
+  if (!key) throw new Error("ANTHROPIC_API_KEY fehlt");
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), opts.timeoutMs ?? 90000);
+  try {
+    let lastErr = "";
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const res = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        signal: ctrl.signal,
+        headers: { "content-type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01" },
+        body: JSON.stringify({
+          model: opts.model,
+          max_tokens: opts.maxTokens ?? 2000,
+          system: opts.system,
+          messages: [{ role: "user", content: user }],
+          tools: [{ name: "antwort", description: "Strukturierte Antwort abgeben.", input_schema: schema }],
+          tool_choice: { type: "tool", name: "antwort" },
+        }),
+      });
+      if (res.status === 429 || res.status >= 500 || res.status === 529) {
+        lastErr = `${res.status} ${await res.text()}`;
+        await new Promise((r) => setTimeout(r, 1500 * (attempt + 1)));
+        continue;
+      }
+      if (!res.ok) throw new Error(`Anthropic ${res.status}: ${(await res.text()).slice(0, 500)}`);
+      const data = await res.json();
+      const block = (data.content ?? []).find((c: { type: string }) => c.type === "tool_use");
+      const text = (data.content ?? []).filter((c: { type: string }) => c.type === "text").map((c: { text: string }) => c.text).join("\n");
+      return { value: (block?.input as T) ?? null, raw: { text: text || JSON.stringify(block?.input ?? null), usage: data.usage, model: data.model ?? opts.model } };
+    }
+    throw new Error("Anthropic nicht erreichbar: " + lastErr.slice(0, 300));
+  } finally {
+    clearTimeout(t);
+  }
+}
