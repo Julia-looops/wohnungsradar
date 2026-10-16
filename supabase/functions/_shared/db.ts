@@ -44,6 +44,9 @@ export interface Criteria {
 
 /** Lauf-Protokoll */
 export async function startRun(fn: string): Promise<string> {
+  // Hängengebliebene Läufe (Zeitlimit der Edge Runtime) als abgebrochen markieren
+  await admin().from("runs").update({ ok: false, finished_at: new Date().toISOString(), error: "abgebrochen (Zeitlimit oder Neustart)" })
+    .is("finished_at", null).lt("started_at", new Date(Date.now() - 8 * 60000).toISOString());
   const { data } = await admin().from("runs").insert({ fn }).select("id").single();
   return data?.id as string;
 }

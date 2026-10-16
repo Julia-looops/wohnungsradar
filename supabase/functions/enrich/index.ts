@@ -21,7 +21,7 @@ Deno.serve(async (req) => {
   const db = admin();
   const runId = await startRun("enrich");
   try {
-    const batchSize = await getSetting<number>("enrich_batch", 20);
+    const batchSize = await getSetting<number>("enrich_batch", 6);
     const noiseApi = await getSetting<string>("noise_api", "https://gis.lfrz.gv.at/api/geodata/i000804/ogc/features/v1");
     const wfsBase = await getSetting<string>("wien_wfs", "https://data.wien.gv.at/daten/geo");
 
@@ -147,7 +147,7 @@ async function noise_(api: string, lat: number, lng: number) {
     out[k] = feats.length ? { db: lv.db, label: lv.label, props: lv.props } : { db: null, label: "keine Lärmzone (unter Kartierungsschwelle)" };
   });
   // Straßen- und Bahnnähe aus OSM als zweiter Indikator
-  const q = `[out:json][timeout:20];(way(around:70,${lat},${lng})[highway~"^(motorway|trunk|primary|secondary|tertiary)$"];way(around:150,${lat},${lng})[railway~"^(rail|light_rail|tram)$"];);out tags center;`;
+  const q = `[out:json][timeout:12];(way(around:70,${lat},${lng})[highway~"^(motorway|trunk|primary|secondary|tertiary)$"];way(around:150,${lat},${lng})[railway~"^(rail|light_rail|tram)$"];);out tags center;`;
   const osm = await overpass(q);
   if (osm) {
     const roads = osm.elements.filter((e) => (e.tags as Record<string, string>)?.highway).map((e) => {
@@ -184,7 +184,7 @@ async function transit_(lat: number, lng: number) {
   let bus = pick((m) => m.some((x) => /bus/i.test(x)));
   if (!stops.length) {
     // Fallback über OSM
-    const q = `[out:json][timeout:20];(node(around:1200,${lat},${lng})[station=subway];node(around:1200,${lat},${lng})[railway=station][station=subway];node(around:800,${lat},${lng})[railway=tram_stop];);out body;`;
+    const q = `[out:json][timeout:12];(node(around:1200,${lat},${lng})[station=subway];node(around:1200,${lat},${lng})[railway=station][station=subway];node(around:800,${lat},${lng})[railway=tram_stop];);out body;`;
     const osm = await overpass(q);
     if (osm) {
       const els = osm.elements.map((e) => ({ tags: e.tags as Record<string, string>, lat: e.lat as number, lon: e.lon as number }))
@@ -201,7 +201,7 @@ async function transit_(lat: number, lng: number) {
 
 async function green_(wfs: string, lat: number, lng: number) {
   const feats = await wienWfs(wfs, "ogdwien:OEFFGRUENFLOGD", bboxAround(lat, lng, 300), 100);
-  const trees = await wienWfs(wfs, "ogdwien:BAUMKATOGD", bboxAround(lat, lng, 120), 400).catch(() => null);
+  const trees = await wienWfs(wfs, "ogdwien:BAUMKATOGD", bboxAround(lat, lng, 120), 150).catch(() => null);
   if (feats === null) return null;
   const names = feats.map((f) => String(f.properties?.ANL_NAME ?? f.properties?.NAME ?? f.properties?.BEZEICHNUNG ?? f.properties?.KATEGORIE ?? "Grünfläche")).filter(Boolean);
   const uniq = [...new Set(names)].slice(0, 8);

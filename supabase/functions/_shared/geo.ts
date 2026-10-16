@@ -71,7 +71,7 @@ export function noiseLevel(features: WfsFeature[]): { db: number | null; label: 
 /** Overpass: Hauptstraßen und Bahn in der Nähe (Lärm-Indikator) und Öffi-Haltestellen als Fallback */
 export async function overpass(query: string): Promise<{ elements: Array<Record<string, unknown>> } | null> {
   const r = await fetchText("https://overpass-api.de/api/interpreter", {
-    method: "POST", timeoutMs: 25000, body: "data=" + encodeURIComponent(query),
+    method: "POST", timeoutMs: 15000, body: "data=" + encodeURIComponent(query),
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
   });
   if (!r.ok) return null;

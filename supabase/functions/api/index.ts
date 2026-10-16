@@ -39,6 +39,9 @@ Deno.serve(async (req) => {
         const { data, error } = await q;
         if (error) throw error;
         let rows = (data ?? []).map(flatten);
+        const imgCount = new Map<string, number>();
+        for (const r of rows) if (r.image) imgCount.set(r.image, (imgCount.get(r.image) ?? 0) + 1);
+        for (const r of rows) if (r.image && (imgCount.get(r.image) ?? 0) > 1) r.image = null;
         if (!includeHardFail) rows = rows.filter((r) => r.hard_ok !== false);
         if (status === "neu") rows = rows.filter((r) => !r.rating_status || r.rating_status === "neu");
         else if (status !== "alle") rows = rows.filter((r) => r.rating_status === status);

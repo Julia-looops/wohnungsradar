@@ -54,6 +54,7 @@ Deno.serve(async (req) => {
         error = String((e as Error)?.message ?? e).slice(0, 900);
         log(`${src.id}: FEHLER ${error}`);
       }
+      dropSharedImages(cands);
       const stats = await storeCandidates(src.id, cands, crit, allowedPlz);
       summary[src.id] = { ...stats, error, ms: Date.now() - started };
       await db.from("sources").update({
@@ -147,4 +148,11 @@ async function storeCandidates(sourceId: string, cands: Candidate[], crit: { har
     }
   }
   return stats;
+}
+
+/** Bilder, die bei mehreren Inseraten derselben Quelle auftauchen, sind Platzhalter/Logos → entfernen */
+function dropSharedImages(cands: Candidate[]) {
+  const count = new Map<string, number>();
+  for (const c of cands) for (const u of new Set(c.images ?? [])) count.set(u, (count.get(u) ?? 0) + 1);
+  for (const c of cands) if (c.images) c.images = c.images.filter((u) => (count.get(u) ?? 0) <= 1);
 }

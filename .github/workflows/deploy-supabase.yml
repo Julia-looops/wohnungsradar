@@ -84,6 +84,12 @@ jobs:
           curl -s -X POST "https://$PROJECT_REF.supabase.co/functions/v1/collect" \
             -H "apikey: $SUPABASE_SECRET_KEY" -H "Content-Type: application/json" -d '{"all":true}' --max-time 170 | head -c 3000 | tee /tmp/collect.txt; echo
 
+      - name: Anreicherung/Bewertung anstoßen
+        if: ${{ contains(github.event.head_commit.message, '[enrich]') }}
+        continue-on-error: true
+        run: |
+          curl -s -X POST "https://$PROJECT_REF.supabase.co/functions/v1/enrich" -H "apikey: $SUPABASE_SECRET_KEY" -H "Content-Type: application/json" -d '{}' --max-time 170 | head -c 2000 | tee /tmp/enrich.txt; echo
+
       - name: Status (Läufe, Quellen, Top-Inserate)
         if: always()
         continue-on-error: true
