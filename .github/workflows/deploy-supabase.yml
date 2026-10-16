@@ -84,6 +84,24 @@ jobs:
           curl -s -X POST "https://$PROJECT_REF.supabase.co/functions/v1/collect" \
             -H "apikey: $SUPABASE_SECRET_KEY" -H "Content-Type: application/json" -d '{"all":true}' --max-time 170 | head -c 3000 | tee /tmp/collect.txt; echo
 
+      - name: Status (Läufe, Quellen, Top-Inserate)
+        if: always()
+        continue-on-error: true
+        run: |
+          curl -s -X POST "https://$PROJECT_REF.supabase.co/functions/v1/api" -H "apikey: $SUPABASE_SECRET_KEY" -H "Content-Type: application/json" -d '{"action":"bootstrap"}' --max-time 60 > /tmp/b.json
+          curl -s -X POST "https://$PROJECT_REF.supabase.co/functions/v1/api" -H "apikey: $SUPABASE_SECRET_KEY" -H "Content-Type: application/json" -d '{"action":"listings","status":"alle","include_hard_fail":true,"limit":400}' --max-time 60 > /tmp/l.json
+          python3 - <<'EOF' | tee /tmp/status.txt
+          import json
+          b=json.load(open('/tmp/b.json')); l=json.load(open('/tmp/l.json')).get('listings',[])
+          print('Zähler:', b.get('counts'))
+          print('Quellen:')
+          for s in b.get('sources',[]): print(' ', s['id'], '|', s.get('last_status'), '|', s.get('last_count'), 'gefunden', s.get('last_new'), 'neu |', (s.get('last_error') or '')[:160])
+          print('Läufe:')
+          for r in b.get('runs',[]): print(' ', r['started_at'][:19], r['fn'], 'ok' if r['ok'] else ('läuft' if r['ok'] is None else 'FEHLER'), (r.get('error') or '')[:160], json.dumps(r.get('summary') or {})[:300])
+          print('Inserate gesamt:', len(l), '| bewertet:', sum(1 for x in l if x.get('score') is not None), '| hart ok:', sum(1 for x in l if x.get('hard_ok')), '| mit Koordinaten:', sum(1 for x in l if x.get('lat')))
+          for x in sorted(l, key=lambda x: -(x.get('score') or -1))[:8]: print(' ', x.get('score'), x.get('hard_ok'), x.get('district'), x.get('price'), x.get('area_m2'), (x.get('title') or '')[:60], '|', (x.get('reasoning') or '')[:200])
+          EOF
+
       - name: Function-Logs holen
         if: always()
         continue-on-error: true
@@ -93,7 +111,7 @@ jobs:
         if: always()
         continue-on-error: true
         run: |
-          { echo "## post_deploy"; cat /tmp/post_deploy.txt 2>/dev/null || echo "(übersprungen)"; echo; echo "## Funktionstest"; cat /tmp/fntest.txt 2>/dev/null; echo; echo "## Sammellauf"; cat /tmp/collect.txt 2>/dev/null || echo "(nicht gestartet)"; echo; echo "## Logs"; cat /tmp/fnlogs.txt 2>/dev/null; } > /tmp/report.txt
+          { echo "## post_deploy"; cat /tmp/post_deploy.txt 2>/dev/null || echo "(übersprungen)"; echo; echo "## Funktionstest"; cat /tmp/fntest.txt 2>/dev/null; echo; echo "## Sammellauf"; cat /tmp/collect.txt 2>/dev/null || echo "(nicht gestartet)"; echo; echo "## Status"; cat /tmp/status.txt 2>/dev/null; echo; echo "## Logs"; cat /tmp/fnlogs.txt 2>/dev/null; } > /tmp/report.txt
           bash scripts/report.sh "Deploy Supabase – ${{ job.status }}" /tmp/report.txt
 
       - name: Ergebnis
