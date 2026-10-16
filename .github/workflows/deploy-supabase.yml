@@ -1,0 +1,65 @@
+name: Deploy Supabase
+
+on:
+  push:
+    branches: [main]
+    paths: ["supabase/**", "scripts/**", ".github/workflows/deploy-supabase.yml"]
+  workflow_dispatch:
+    inputs:
+      run_collect:
+        description: "Nach dem Deployment einen Sammellauf starten"
+        type: boolean
+        default: false
+
+concurrency:
+  group: deploy-supabase
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      PROJECT_REF: ywmarawkaozbizrunykf
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Projekt verknüpfen
+        run: supabase link --project-ref "$PROJECT_REF" -p "$SUPABASE_DB_PASSWORD"
+
+      - name: Migrationen anwenden
+        run: supabase db push -p "$SUPABASE_DB_PASSWORD" --include-all
+
+      - name: Edge Functions deployen
+        run: supabase functions deploy --project-ref "$PROJECT_REF"
+
+      - name: Vault, App-Token, VAPID, Haltestellen
+        env:
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+          APP_TOKEN: ${{ secrets.APP_TOKEN }}
+        run: python3 scripts/post_deploy.py
+
+      - name: Funktionstest (api/bootstrap)
+        env:
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+        run: |
+          code=$(curl -s -o /tmp/boot.json -w "%{http_code}" -X POST "https://$PROJECT_REF.supabase.co/functions/v1/api" \
+            -H "apikey: $SUPABASE_SECRET_KEY" -H "Content-Type: application/json" -d '{"action":"bootstrap"}')
+          echo "HTTP $code"
+          python3 -c "import json;d=json.load(open('/tmp/boot.json'));print('Quellen:',len(d.get('sources',[])),'| aktive Inserate:',d.get('counts'),'| VAPID gesetzt:',bool(d.get('vapid_public')))"
+          test "$code" = "200"
+
+      - name: Sammellauf starten
+        if: ${{ github.event.inputs.run_collect == 'true' }}
+        env:
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+        run: |
+          curl -s -X POST "https://$PROJECT_REF.supabase.co/functions/v1/collect" \
+            -H "apikey: $SUPABASE_SECRET_KEY" -H "Content-Type: application/json" -d '{"all":true}' --max-time 170 | head -c 2000

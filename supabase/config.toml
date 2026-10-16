@@ -1,0 +1,14 @@
+project_id = "ywmarawkaozbizrunykf"
+
+[functions.collect]
+verify_jwt = false
+[functions.enrich]
+verify_jwt = false
+[functions.score]
+verify_jwt = false
+[functions.notify]
+verify_jwt = false
+[functions.learn]
+verify_jwt = false
+[functions.api]
+verify_jwt = false

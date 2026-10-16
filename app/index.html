@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Wohnungsradar Wien</title>
+  <meta name="description" content="Eigentumswohnung in Wien – gesammelt, angereichert, bewertet.">
+  <meta name="theme-color" content="#1b4332" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0f1f17" media="(prefers-color-scheme: dark)">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Wohnungsradar">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="robots" content="noindex, nofollow">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand"><span class="dot"></span>Wohnungsradar <span class="muted">Wien</span></div>
+    <div id="topstatus" class="muted small"></div>
+  </header>
+
+  <main id="view" class="view"></main>
+
+  <nav class="tabbar" id="tabbar">
+    <a href="#/list" data-tab="list"><span class="ico">☰</span>Liste</a>
+    <a href="#/map" data-tab="map"><span class="ico">◎</span>Karte</a>
+    <a href="#/settings" data-tab="settings"><span class="ico">⚙</span>Einstellungen</a>
+  </nav>
+
+  <div id="toast" class="toast" hidden></div>
+
+  <template id="tpl-nokey">
+    <section class="card center">
+      <h2>Kein Zugang</h2>
+      <p>Öffne den Wohnungsradar über den Link, den du bekommen hast (er enthält den Zugangsschlüssel). Danach merkt sich dieses Gerät den Zugang.</p>
+      <p><input id="keyinput" placeholder="Schlüssel einfügen" class="input"> <button id="keysave" class="btn">Speichern</button></p>
+    </section>
+  </template>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
