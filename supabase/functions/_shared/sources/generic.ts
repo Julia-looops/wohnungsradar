@@ -129,6 +129,7 @@ ${links}`;
   const out: ListHit[] = [];
   for (const h of arr) {
     if (!h?.url) continue;
+    if (h.price == null && h.area_m2 == null && h.rooms == null && !h.plz && !(h.title && h.title.length > 12)) continue;
     try {
       const abs = new URL(String(h.url), base).toString().replace(/#.*$/, "");
       out.push({ url: abs, title: h.title, price: parseEuro(h.price), area_m2: parseNumber(h.area_m2), rooms: parseNumber(h.rooms), plz: h.plz ? findPlz(String(h.plz)) : null, note: h.note });
@@ -167,6 +168,10 @@ ${text}`;
     ctx.log(`${src.id}: Extraktion fehlgeschlagen ${h.url}: ${String(e).slice(0, 100)}`);
   }
   if (ex && (ex.is_sale === false || ex.is_vienna === false)) return null;
+  // Keine Fakten → vermutlich Such-/Übersichtsseite statt Inserat
+  const facts = [ex?.price, ex?.area_m2, ex?.rooms, h.price, h.area_m2, h.rooms].filter((v) => v != null && v !== 0);
+  if (facts.length === 0) return null;
+  if (src.urls.some((u) => u.replace(/\/$/, "") === h.url.replace(/\/$/, ""))) return null;
   const merged: ListHit = {
     url: h.url,
     title: ex?.title ?? og ?? h.title,
