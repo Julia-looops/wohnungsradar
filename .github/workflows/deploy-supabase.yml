@@ -78,7 +78,7 @@ jobs:
           test "$code" = "200"
 
       - name: Sammellauf starten
-        if: ${{ github.event.inputs.run_collect == 'true' }}
+        if: ${{ github.event.inputs.run_collect == 'true' || contains(github.event.head_commit.message, '[collect]') }}
         continue-on-error: true
         run: |
           curl -s -X POST "https://$PROJECT_REF.supabase.co/functions/v1/collect" \
