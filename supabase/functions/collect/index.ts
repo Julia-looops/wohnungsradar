@@ -6,6 +6,7 @@ import { admin, allowedDistricts, finishRun, getCriteria, getSetting, startRun }
 import { authenticate, json, triggerNext, unauthorized, corsHeaders } from "../_shared/auth.ts";
 import { collectWillhaben } from "../_shared/sources/apify_willhaben.ts";
 import { collectGeneric } from "../_shared/sources/generic.ts";
+import { resolveModel } from "../_shared/claude.ts";
 import { Candidate, CollectContext, SourceRow, dedupeKey } from "../_shared/sources/types.ts";
 
 const SOURCES_PER_CALL = 3;
@@ -26,7 +27,7 @@ Deno.serve(async (req) => {
     const allowed = allowedDistricts(crit);
     const allowedPlz = new Set([...allowed].map((d) => `1${String(d).padStart(2, "0")}0`));
     const maxPerSource = await getSetting<number>("collect_max_per_source", 60);
-    const extractModel = await getSetting<string>("model_extract", "claude-haiku-4-5");
+    const extractModel = await resolveModel(await getSetting<string>("model_extract", "claude-haiku-4-5"), "haiku");
 
     // Welche Quellen sind dran? Explizit angefragte, sonst alle aktiven, die heute noch nicht liefen.
     const force = Array.isArray(body.sources) ? (body.sources as string[]) : null;

@@ -6,7 +6,7 @@
 
 import { admin, finishRun, getCriteria, getSetting, startRun } from "../_shared/db.ts";
 import { authenticate, corsHeaders, json, triggerNext, unauthorized } from "../_shared/auth.ts";
-import { askClaudeJson } from "../_shared/claude.ts";
+import { askClaudeJson, resolveModel } from "../_shared/claude.ts";
 import { mapLimit } from "../_shared/http.ts";
 import { Assessment, ListingForScore, buildScorePrompt, computeScore, hardPrecheck } from "../_shared/scoring.ts";
 
@@ -22,7 +22,7 @@ Deno.serve(async (req) => {
   const runId = await startRun("score");
   try {
     const { doc: crit, version } = await getCriteria();
-    const model = await getSetting<string>("model_score", "claude-sonnet-4-5");
+    const model = await resolveModel(await getSetting<string>("model_score", "claude-sonnet-4-5"), "sonnet");
     const batch = await getSetting<number>("score_batch", 10);
 
     if (body.mode === "recompute") {

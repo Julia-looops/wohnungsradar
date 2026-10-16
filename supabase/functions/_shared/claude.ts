@@ -75,3 +75,31 @@ export async function askClaudeJson<T = unknown>(user: string, opts: ClaudeOptio
   const raw = await askClaude(user, opts);
   return { value: parseJson<T>(raw.text), raw };
 }
+
+/** Verfügbare Modelle laut API (id, display_name, created_at) */
+export async function listModels(): Promise<Array<{ id: string; display_name?: string; created_at?: string }>> {
+  const res = await fetch("https://api.anthropic.com/v1/models?limit=100", {
+    headers: { "x-api-key": anthropicKey(), "anthropic-version": "2023-06-01" },
+  });
+  if (!res.ok) throw new Error(`Anthropic models ${res.status}`);
+  const data = await res.json();
+  return Array.isArray(data?.data) ? data.data : [];
+}
+
+/**
+ * Modellnamen auflösen: Wunschmodell, wenn vorhanden; sonst das neueste Modell derselben Familie
+ * (sonnet/haiku/opus), damit ein zurückgezogener Alias den Radar nicht lahmlegt.
+ */
+export async function resolveModel(preferred: string, family: "sonnet" | "haiku" | "opus"): Promise<string> {
+  try {
+    const models = await listModels();
+    const ids = models.map((m) => m.id);
+    if (ids.includes(preferred)) return preferred;
+    const fam = models.filter((m) => m.id.toLowerCase().includes(family))
+      .sort((a, b) => String(b.created_at ?? "").localeCompare(String(a.created_at ?? "")));
+    if (fam.length) return fam[0].id;
+    return preferred;
+  } catch {
+    return preferred;
+  }
+}

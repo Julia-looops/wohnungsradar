@@ -96,9 +96,12 @@ jobs:
         run: |
           curl -s -X POST "https://$PROJECT_REF.supabase.co/functions/v1/api" -H "apikey: $SUPABASE_SECRET_KEY" -H "Content-Type: application/json" -d '{"action":"bootstrap"}' --max-time 60 > /tmp/b.json
           curl -s -X POST "https://$PROJECT_REF.supabase.co/functions/v1/api" -H "apikey: $SUPABASE_SECRET_KEY" -H "Content-Type: application/json" -d '{"action":"listings","status":"alle","include_hard_fail":true,"limit":400}' --max-time 60 > /tmp/l.json
+          curl -s -X POST "https://$PROJECT_REF.supabase.co/functions/v1/api" -H "apikey: $SUPABASE_SECRET_KEY" -H "Content-Type: application/json" -d '{"action":"models"}' --max-time 60 > /tmp/m.json
           python3 - <<'EOF' | tee /tmp/status.txt
           import json
           b=json.load(open('/tmp/b.json')); l=json.load(open('/tmp/l.json')).get('listings',[])
+          try: print('Modelle:', ', '.join(m['id'] for m in json.load(open('/tmp/m.json')).get('models',[])))
+          except Exception as e: print('Modelle: ?', e)
           print('Zähler:', b.get('counts'))
           print('Quellen:')
           for s in b.get('sources',[]): print(' ', s['id'], '|', s.get('last_status'), '|', s.get('last_count'), 'gefunden', s.get('last_new'), 'neu |', (s.get('last_error') or '')[:160])

@@ -3,6 +3,7 @@
 import { admin, Criteria, getCriteria, getSetting } from "../_shared/db.ts";
 import { authenticate, corsHeaders, json, triggerNext, unauthorized } from "../_shared/auth.ts";
 import { secretKey, supabaseUrl } from "../_shared/env.ts";
+import { listModels } from "../_shared/claude.ts";
 
 const LIST_COLS = "id,source,url,title,price,area_m2,rooms,plz,district,address,lat,lng,floor,images,first_seen,last_seen,published_at,seller_type,active,duplicate_of,dedupe_key";
 
@@ -137,6 +138,11 @@ Deno.serve(async (req) => {
       case "sources_update": {
         await db.from("sources").update({ enabled: body.enabled === true }).eq("id", String(body.id ?? ""));
         return json({ ok: true });
+      }
+      case "models": {
+        if (caller !== "service") return unauthorized();
+        const models = await listModels();
+        return json({ models: models.map((m) => ({ id: m.id, created_at: m.created_at })) });
       }
       case "notes": {
         const { data } = await db.from("learning_notes").select("*").order("created_at", { ascending: false }).limit(20);

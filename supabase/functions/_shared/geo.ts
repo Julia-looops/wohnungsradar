@@ -88,3 +88,12 @@ export function haversine(lat1: number, lng1: number, lat2: number, lng2: number
 export function walkMinutes(meters: number): number {
   return Math.round((meters * 1.25) / 80); // Umwegfaktor 1,25 und 4,8 km/h
 }
+
+/** Ungefähre Bezirksmittelpunkte (Fallback, wenn Nominatim nichts liefert) */
+export const DISTRICT_CENTROIDS: Record<number, [number, number]> = {
+  1: [48.2082, 16.3738], 2: [48.2167, 16.4000], 3: [48.1983, 16.3950], 4: [48.1920, 16.3710], 5: [48.1870, 16.3580],
+  6: [48.1950, 16.3520], 7: [48.2020, 16.3490], 8: [48.2110, 16.3480], 9: [48.2230, 16.3580], 10: [48.1700, 16.3800],
+  11: [48.1700, 16.4300], 12: [48.1750, 16.3300], 13: [48.1800, 16.2800], 14: [48.2050, 16.2800], 15: [48.1950, 16.3250],
+  16: [48.2120, 16.3100], 17: [48.2250, 16.3050], 18: [48.2320, 16.3300], 19: [48.2500, 16.3500], 20: [48.2400, 16.3750],
+  21: [48.2700, 16.4200], 22: [48.2300, 16.4800], 23: [48.1400, 16.3000],
+};

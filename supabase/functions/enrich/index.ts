@@ -4,7 +4,7 @@
 import { admin, finishRun, getSetting, startRun } from "../_shared/db.ts";
 import { authenticate, corsHeaders, json, triggerNext, unauthorized } from "../_shared/auth.ts";
 import { sleep } from "../_shared/http.ts";
-import { GeoPoint, bboxAround, haversine, noiseFeatures, noiseLevel, nominatim, overpass, walkMinutes, wienWfs } from "../_shared/geo.ts";
+import { DISTRICT_CENTROIDS, GeoPoint, bboxAround, haversine, noiseFeatures, noiseLevel, nominatim, overpass, walkMinutes, wienWfs } from "../_shared/geo.ts";
 
 interface Listing {
   id: string; title: string | null; price: number | null; area_m2: number | null; plz: string | null; district: number | null;
@@ -122,6 +122,11 @@ async function geocode(l: Listing, errors: string[]): Promise<GeoPoint | null> {
       if (c.includes("Österreich")) p.precision = "plz";
       return p;
     }
+  }
+  if (l.district && DISTRICT_CENTROIDS[l.district]) {
+    const [lat, lng] = DISTRICT_CENTROIDS[l.district];
+    errors.push("geocode: Adresse nicht gefunden, Bezirksmittelpunkt verwendet");
+    return { lat, lng, display: `${l.district}. Bezirk (Mittelpunkt)`, precision: "plz" };
   }
   errors.push("geocode: keine Koordinaten für " + candidates.join(" / "));
   return null;

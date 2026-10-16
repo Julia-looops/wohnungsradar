@@ -3,7 +3,7 @@
 
 import { admin, Criteria, finishRun, getCriteria, getSetting, startRun } from "../_shared/db.ts";
 import { authenticate, corsHeaders, json, triggerNext, unauthorized } from "../_shared/auth.ts";
-import { askClaudeJson } from "../_shared/claude.ts";
+import { askClaudeJson, resolveModel } from "../_shared/claude.ts";
 import { sendPush } from "../_shared/push.ts";
 
 interface LearnOut {
@@ -24,7 +24,7 @@ Deno.serve(async (req) => {
   const db = admin();
   const runId = await startRun("learn");
   try {
-    const model = await getSetting<string>("model_learn", "claude-sonnet-4-5");
+    const model = await resolveModel(await getSetting<string>("model_learn", "claude-sonnet-4-5"), "sonnet");
     const { doc: crit, version } = await getCriteria();
 
     const { data: ratings } = await db.from("ratings")
