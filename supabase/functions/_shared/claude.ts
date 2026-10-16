@@ -123,9 +123,10 @@ export async function askClaudeStructured<T = unknown>(user: string, schema: Rec
           model: opts.model,
           max_tokens: opts.maxTokens ?? 2000,
           system: opts.system,
-          messages: [{ role: "user", content: user }],
-          tools: [{ name: "antwort", description: "Strukturierte Antwort abgeben.", input_schema: schema }],
-          tool_choice: { type: "tool", name: "antwort" },
+          messages: [{ role: "user", content: user + "\n\nWICHTIG: Antworte ausschließlich über das Tool \"antwort\" – kein Freitext." }],
+          // Erzwungenes tool_choice wird von neueren Modellen abgelehnt → auto + klare Anweisung, Text-JSON als Fallback
+          tools: [{ name: "antwort", description: "Gib deine Antwort ausschließlich über dieses Tool ab (Pflicht).", input_schema: schema }],
+          tool_choice: { type: "auto" },
         }),
       });
       if (res.status === 429 || res.status >= 500 || res.status === 529) {
@@ -137,7 +138,8 @@ export async function askClaudeStructured<T = unknown>(user: string, schema: Rec
       const data = await res.json();
       const block = (data.content ?? []).find((c: { type: string }) => c.type === "tool_use");
       const text = (data.content ?? []).filter((c: { type: string }) => c.type === "text").map((c: { text: string }) => c.text).join("\n");
-      return { value: (block?.input as T) ?? null, raw: { text: text || JSON.stringify(block?.input ?? null), usage: data.usage, model: data.model ?? opts.model } };
+      const value = (block?.input as T) ?? parseJson<T>(text);
+      return { value, raw: { text: text || JSON.stringify(block?.input ?? null), usage: data.usage, model: data.model ?? opts.model } };
     }
     throw new Error("Anthropic nicht erreichbar: " + lastErr.slice(0, 300));
   } finally {
